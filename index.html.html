@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hub de Qualidade & Planilha | Obra Augen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- PDF.js & SheetJS (xlsx) para ler PDF de NCs e planilhas Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: #f8fafc; }
+    .sidebar-transition { transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease; }
+    .wa-bubble { background-color: #ffffff; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+    .wa-bg { background-color: #efeae2; background-image: radial-gradient(#d1ccc0 0.75px, transparent 0.75px); background-size: 16px 16px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+  <!-- Notificação Toast -->
+  <div id="toastBox" class="fixed top-16 right-6 z-50 hidden bg-emerald-600 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-bold border border-emerald-400">
+    <i class="fa-brands fa-whatsapp text-2xl"></i>
+    <span id="toastMsg">Foto + Legenda copiadas! Dê apenas 1 Ctrl+V no WhatsApp.</span>
+  </div>
+
+  <!-- Cabeçalho Principal -->
+  <header class="bg-slate-900 text-white px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 shadow-md z-20">
+    <div class="flex items-center space-x-3">
+      <button onclick="toggleSidebar()" title="Ocultar/Exibir Árvore (Tecla B)" class="bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-200 w-9 h-9 rounded-lg flex items-center justify-center transition border border-slate-700">
+        <i class="fa-solid fa-bars-staggered"></i>
+      </button>
+
+      <div class="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded text-base tracking-wider">PRIDE</div>
+      <div class="hidden sm:block">
+        <h1 class="text-sm md:text-base font-bold leading-tight">Hub de Qualidade & Planilha — Obra Augen</h1>
+        <p class="text-[11px] text-slate-400">Controle Operacional Integrado (Checklist 72 Apts + NCs WhatsApp)</p>
+      </div>
+    </div>
+
+    <!-- Navegação por Abas -->
+    <div class="flex items-center bg-slate-800 p-1 rounded-xl border border-slate-700 flex-wrap gap-1">
+      <button id="tabBtnHub" onclick="switchTab('HUB')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-amber-500 text-slate-950 shadow">
+        <i class="fa-solid fa-table-columns mr-1"></i> Painel NCs
+      </button>
+      <button id="tabBtnSheet" onclick="switchTab('SHEET')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-sky-400 hover:text-white flex items-center gap-1.5">
+        <i class="fa-solid fa-file-excel text-sm"></i> Planilha Checklist (72 Apts)
+      </button>
+      <button id="tabBtnWhats" onclick="switchTab('WHATS')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-emerald-400 hover:text-white flex items-center gap-1.5">
+        <i class="fa-brands fa-whatsapp text-sm"></i> Fila WhatsApp
+      </button>
+      <button id="tabBtnImport" onclick="switchTab('IMPORT')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white flex items-center gap-1.5">
+        <i class="fa-solid fa-file-pdf text-amber-400"></i> Importar PDF NC
+      </button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button onclick="openModal()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-semibold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-plus"></i> NC Manual
+      </button>
+    </div>
+  </header>
+
+  <!-- Corpo Principal -->
+  <div class="flex flex-1 overflow-hidden relative">
+    
+    <!-- Menu Lateral em Árvore -->
+    <aside id="leftSidebar" class="w-76 bg-white border-r border-slate-200 flex flex-col overflow-y-auto select-none shrink-0 sidebar-transition">
+      <div class="p-3.5 border-b border-slate-100 flex items-center justify-between">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Árvore da Obra</span>
+        <button onclick="toggleSidebar()" class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded font-semibold">
+          <i class="fa-solid fa-angles-left"></i> Ocultar [B]
+        </button>
+      </div>
+
+      <div class="p-3 border-b border-slate-100">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" oninput="renderAll()" placeholder="Buscar NC, apto, cômodo..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-amber-500">
+        </div>
+      </div>
+
+      <div id="treeContainer" class="p-3 space-y-1 flex-1 overflow-y-auto text-sm"></div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex justify-between items-center">
+        <span><i class="fa-solid fa-database mr-1 text-emerald-600"></i> Hub Ativo</span>
+        <button onclick="resetData()" class="text-red-500 hover:underline font-semibold">Resetar</button>
+      </div>
+    </aside>
+
+    <button id="floatingShowBtn" onclick="toggleSidebar()" class="hidden fixed left-3 bottom-5 z-30 bg-slate-900 hover:bg-amber-500 text-white hover:text-slate-950 font-bold px-3.5 py-2 rounded-xl shadow-xl border border-slate-700 text-xs items-center gap-2 transition">
+      <i class="fa-solid fa-sitemap text-amber-400"></i> Mostrar Árvore <span class="opacity-60 text-[10px]">[B]</span>
+    </button>
+
+    <!-- ABA 1: PAINEL DE NCs -->
+    <main id="viewHub" class="flex-1 flex flex-col overflow-y-auto p-4 md:p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center space-x-2">
+          <span class="text-xs font-bold text-slate-400 uppercase px-1">Local:</span>
+          <span id="breadcrumbTitle" class="text-xs font-bold text-slate-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-md">094 - AUGEN > Todos os Apartamentos</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center space-x-2 text-xs">
+            <span class="font-bold text-slate-400 uppercase">Equipe:</span>
+            <select id="roleFilter" onchange="renderAll()" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-semibold text-slate-700 focus:outline-none">
+              <option value="ALL">Todas as Equipes</option>
+              <option value="Pintor">Pintura</option>
+              <option value="Azulejista">Azulejista / Cerâmica</option>
+              <option value="Pedreiro / Fachada">Pedreiro / Requadro</option>
+              <option value="Carpinteiro">Carpinteiro / Portas</option>
+              <option value="Esquadrias">Esquadrias de Alumínio</option>
+              <option value="Gesseiro / Pintor">Gesso / Forro</option>
+              <option value="Eletricista">Elétrica / Interfone</option>
+              <option value="Acabamento Final">Acabamento Final</option>
+            </select>
+          </div>
+          <button onclick="switchTab('WHATS')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition">
+            <i class="fa-brands fa-whatsapp text-sm"></i> Fila WhatsApp
+          </button>
+        </div>
+      </div>
+
+      <div id="cardsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 pb-12"></div>
+    </main>
+
+    <!-- ABA 2: PLANILHA CHECKLIST DOS 72 APARTAMENTOS -->
+    <main id="viewSheet" class="hidden flex-1 flex-col overflow-y-auto p-4 md:p-6 bg-slate-50">
+      <div class="max-w-7xl mx-auto w-full space-y-6 pb-12">
+        
+        <!-- Cabeçalho e Indicadores da Planilha -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span class="bg-sky-100 text-sky-800 text-xs font-bold px-2.5 py-1 rounded-md uppercase">Mapa Operacional 72 Apts</span>
+            <h2 class="text-xl font-black text-slate-800 mt-2">Checklist Geral de Vistorias — Augen</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Clique em qualquer apartamento abaixo para abrir instantaneamente o painel de NCs e fotos dele.</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Aprovados: <b id="statAppr">17</b>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Vistoriados c/ NC: <b id="statNC">3</b>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span> Liberados p/ Vistoria: <b id="statLib">11</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grade de Pavimentos e Apartamentos -->
+        <div id="sheetPavimentsContainer" class="space-y-4"></div>
+
+      </div>
+    </main>
+
+    <!-- ABA 3: FILA DE DISPARO WHATSAPP -->
+    <main id="viewWhats" class="hidden flex-1 flex-col overflow-y-auto wa-bg p-4 md:p-6">
+      <div class="max-w-3xl mx-auto w-full space-y-4 pb-12">
+        <div class="bg-slate-900 text-white p-5 rounded-2xl shadow-lg border border-slate-800 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-2xl font-bold shrink-0">
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-black text-white">Disparo em 1 Único Clique (Foto + Legenda Juntas)</h2>
+                <p class="text-xs text-slate-300">
+                  Clique no botão verde <b>"Copiar Foto + Legenda Juntas"</b> e dê <b>apenas 1 Ctrl+V</b> no WhatsApp!
+                </p>
+              </div>
+            </div>
+            <span class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-emerald-400 font-bold" id="waQueueCount">12 mensagens</span>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <label class="flex items-center gap-2.5 cursor-pointer select-none text-emerald-300 font-semibold">
+              <input type="checkbox" id="burnCaptionToggle" checked class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
+              <span>Unir faixa de legenda embaixo da foto (Garante que 1 único <b>Ctrl+V</b> envie Foto + Texto juntos!)</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="waBubblesContainer" class="space-y-4"></div>
+      </div>
+    </main>
+
+    <!-- ABA 4: IMPORTADOR DE PDF -->
+    <main id="viewImport" class="hidden flex-1 flex-col overflow-y-auto p-6 bg-slate-50">
+      <div class="max-w-4xl mx-auto w-full space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-2.5 py-1 rounded-md uppercase">Leitor Automático de PDF</span>
+          <h2 class="text-xl font-black text-slate-800 mt-2">Importar Relatório PDF de Qualquer Apartamento</h2>
+          <p class="text-xs text-slate-500 mt-1">
+            Selecione o arquivo PDF exportado do Mobuss. O sistema extrai as NCs, recorta a foto pura sem margem branca e simplifica a legenda.
+          </p>
+
+          <label class="mt-5 border-2 border-dashed border-emerald-400 hover:border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 transition rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer text-center">
+            <div class="w-14 h-14 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-2xl mb-3 shadow-md">
+              <i class="fa-solid fa-file-arrow-up"></i>
+            </div>
+            <span class="text-sm font-bold text-slate-800">Clique para selecionar o(s) PDF(s) de Não Conformidade</span>
+            <span class="text-xs text-slate-500 mt-1">Compatível com relatórios do Mobuss / Argon 4.0</span>
+            <input type="file" id="pdfBatchInput" accept="application/pdf" multiple class="hidden" onchange="processMultiplePDFs(event)">
+          </label>
+
+          <div id="importProgressBox" class="hidden mt-6 bg-slate-900 text-slate-100 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between text-xs font-bold">
+              <span id="importStatusText" class="flex items-center gap-2 text-emerald-400">
+                <i class="fa-solid fa-gear fa-spin"></i> Processando PDF...
+              </span>
+              <span id="importPercentText">0%</span>
+            </div>
+            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+              <div id="importProgressBar" class="bg-emerald-500 h-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+            <div id="importLogList" class="text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto space-y-1 pt-2 border-t border-slate-800"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Modal Zoom -->
+  <div id="zoomModal" onclick="closeZoom()" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm hidden items-center justify-center z-50 p-4 cursor-zoom-out">
+    <div class="max-w-4xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
+      <div class="w-full flex justify-between items-center text-white mb-2 px-2">
+        <span id="zoomTitle" class="font-bold text-sm"></span>
+        <button onclick="closeZoom()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1 rounded-lg text-xs font-bold"><i class="fa-solid fa-xmark mr-1"></i> Fechar</button>
+      </div>
+      <img id="zoomImg" src="" class="max-h-[82vh] w-auto rounded-xl shadow-2xl border border-slate-700 object-contain bg-black">
+    </div>
+  </div>
+
+  <!-- Modal NC Manual -->
+  <div id="addModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="text-base font-bold text-slate-800">Nova Pendência Manual</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <form id="ncForm" onsubmit="saveNewNC(event)" class="space-y-3 text-xs">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block font-bold text-slate-500 uppercase mb-1">Pavimento</label>
+            <input type="text" id="fPav" required value="Pavimento 6" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-500 uppercase mb-1">Apartamento</label>
+            <input type="text" id="fApto" required placeholder="Ex: APTO 606" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-500 uppercase mb-1">Nº NC</label>
+            <input type="text" id="fNum" required placeholder="Ex: 213199" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-500 uppercase mb-1">Ambiente</label>
+            <input type="text" id="fAmb" required placeholder="Ex: Cozinha..." class="w-full border border-slate-200 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-500 uppercase mb-1">Equipe</label>
+            <select id="fEquipe" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+              <option value="Pintor">Pintor</option>
+              <option value="Azulejista">Azulejista</option>
+              <option value="Pedreiro / Fachada">Pedreiro / Fachada</option>
+              <option value="Carpinteiro">Carpinteiro</option>
+              <option value="Esquadrias">Esquadrias</option>
+              <option value="Gesseiro / Pintor">Gesseiro / Pintor</option>
+              <option value="Eletricista">Eletricista</option>
+              <option value="Acabamento Final">Acabamento Final</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Legenda Curta p/ WhatsApp</label>
+          <input type="text" id="fWaCaption" required placeholder="Ex: Retoque pintura 606 sala" class="w-full border border-emerald-300 bg-emerald-50/40 rounded-lg px-3 py-2 font-semibold">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Anexar Fotos</label>
+          <input type="file" id="fFoto" accept="image/*" multiple class="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-semibold file:bg-amber-50 file:text-amber-700">
+        </div>
+        <div class="pt-3 flex justify-end space-x-2 border-t border-slate-100">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 font-semibold">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Base de dados padrão do APTO 606
+    const initialData = [
+      { id: "213117", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Área de Serviço", item: "Piso e Rodapé Cerâmico", falha: "Rejunte", waCaption: "Rejunte piso e rodapé 606 área de serviço", equipe: "Azulejista", acao: "Limpar junta e reaplicar rejunte no alinhamento do rodapé", status: "Aberta", fotos: ["FOTO_20261014_155912"] },
+      { id: "213116", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Sacada", item: "Pintura Externa", falha: "Sem requadro", waCaption: "Fazer requadro 606 sacada", equipe: "Pedreiro / Fachada", acao: "Executar requadro com argamassa na face inferior do vão e pintar", status: "Aberta", fotos: ["FOTO_20261014_155136"] },
+      { id: "213115", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Sala", item: "Pintura Interna", falha: "Imperfeições", waCaption: "Retocar pintura 606 sala", equipe: "Pintor", acao: "Corrigir massa corrida, lixar fino e repintar os pontos demarcados", status: "Aberta", fotos: ["FOTO_20261014_154816"] },
+      { id: "213114", pav: "Pavimento 6", apto: "APTO 606", ambiente: "BWC 02", item: "Porta", falha: "Batida", waCaption: "Porta batida 606 BWC 02", equipe: "Carpinteiro", acao: "Reparar batida na madeira/batente e retocar pintura branca", status: "Aberta", fotos: ["FOTO_20261014_154737"] },
+      { id: "213113", pav: "Pavimento 6", apto: "APTO 606", ambiente: "BWC 02", item: "Azulejo e Rejuntes", falha: "Nicho mal feito", waCaption: "Arrumar nicho 606 BWC 02", equipe: "Azulejista", acao: "Corrigir encontro das peças do nicho, alinhar borda e rejuntar", status: "Aberta", fotos: ["FOTO_20261014_154549"] },
+      { id: "213112", pav: "Pavimento 6", apto: "APTO 606", ambiente: "BWC 02", item: "Pintura Interna", falha: "Imperfeições", waCaption: "Retocar pintura 606 BWC 02", equipe: "Pintor", acao: "Emassar, lixar e repintar parede abaixo do lavatório e tomada", status: "Aberta", fotos: ["FOTO_20261014_154446"] },
+      { id: "213111", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Quarto 02", item: "Pintura Interna", falha: "Mancha", waCaption: "Tirar mancha pintura 606 quarto 02", equipe: "Pintor", acao: "Lixar mancha, isolar rodapé e aplicar demão de acabamento", status: "Aberta", fotos: ["FOTO_20261014_154322"] },
+      { id: "213110", pav: "Pavimento 6", apto: "APTO 606", ambiente: "BWC 01", item: "Pintura Interna", falha: "Imperfeições", waCaption: "Retocar pintura 606 BWC 01", equipe: "Pintor", acao: "Retocar todos os 6 pontos demarcados com fita no BWC 01", status: "Aberta", fotos: ["FOTO_20261014_154142"] },
+      { id: "213109", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Quarto 01", item: "Janela", falha: "Arranhada", waCaption: "Janela arranhada 606 quarto 01", equipe: "Esquadrias", acao: "Executar polimento/retoque técnico em pintura eletrostática preta", status: "Aberta", fotos: ["FOTO_20261014_15412"] },
+      { id: "213107", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Quarto 01", item: "Forro", falha: "Trinca", waCaption: "Trinca no forro e pintura 606 quarto 01", equipe: "Gesseiro / Pintor", acao: "Tratar trinca no canto do forro de gesso e retocar pintura", status: "Aberta", fotos: ["FOTO_20261014_153935"] },
+      { id: "213106", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Sala", item: "Interfone", falha: "Sem funcionar", waCaption: "Interfone sem funcionar 606", equipe: "Eletricista", acao: "Conectar fiação do monofone, fechar caixa 4x2 e testar chamada", status: "Aberta", fotos: ["FOTO_20261014_153859"] },
+      { id: "213105", pav: "Pavimento 6", apto: "APTO 606", ambiente: "Entrada", item: "Número Predial", falha: "Falta número", waCaption: "Colocar número predial 606 entrada", equipe: "Acabamento Final", acao: "Instalar número predial 606 padronizado na porta de entrada", status: "Aberta", fotos: ["FOTO_20261014_153837"] }
+    ];
+
+    let ncs = JSON.parse(localStorage.getItem('augen_ncs_v6')) || initialData;
+    let currentFilter = { type: 'ALL', value: 'ALL' };
+    let activePhotoIdx = {};
+    let sidebarOpen = true;
+
+    // Dados estruturados da Planilha de Checklist dos 72 Apartamentos
+    const checklistSheetData = [
+      { pav: "2º Pavimento", aptos: [
+        { num: "201", status: "Vistoriado com NC", date: "2026-09-09" },
+        { num: "202", status: "Aprovado", date: "2026-08-12" },
+        { num: "203", status: "Não liberado", date: "-" },
+        { num: "204", status: "Liberado para vistoria", date: "-" },
+        { num: "205", status: "Aprovado", date: "2026-09-02" },
+        { num: "206", status: "Aprovado", date: "2026-08-26" }
+      ]},
+      { pav: "3º Pavimento", aptos: [
+        { num: "301", status: "Aprovado", date: "2026-09-11" },
+        { num: "302", status: "Aprovado", date: "2026-09-09" },
+        { num: "303", status: "Não liberado", date: "-" },
+        { num: "304", status: "Liberado para vistoria", date: "-" },
+        { num: "305", status: "Aprovado", date: "2026-09-30" },
+        { num: "306", status: "Aprovado", date: "2026-09-02" }
+      ]},
+      { pav: "4º Pavimento", aptos: [
+        { num: "401", status: "Aprovado", date: "2026-09-28" },
+        { num: "402", status: "Aprovado", date: "2026-09-09" },
+        { num: "403", status: "Não liberado", date: "-" },
+        { num: "404", status: "Não liberado", date: "-" },
+        { num: "405", status: "Aprovado", date: "2026-09-09" },
+        { num: "406", status: "Liberado para vistoria", date: "-" }
+      ]},
+      { pav: "5º Pavimento", aptos: [
+        { num: "501", status: "Aprovado", date: "2026-10-05" },
+        { num: "502", status: "Aprovado", date: "2026-10-14" },
+        { num: "503", status: "Não liberado", date: "-" },
+        { num: "504", status: "Não liberado", date: "-" },
+        { num: "505", status: "Liberado para vistoria", date: "-" },
+        { num: "506", status: "Liberado para vistoria", date: "-" }
+      ]},
+      { pav: "6º Pavimento", aptos: [
+        { num: "601", status: "Liberado para vistoria", date: "2026-10-14" },
+        { num: "602", status: "Liberado para vistoria", date: "2026-10-14" },
+        { num: "603", status: "Não liberado", date: "-" },
+        { num: "604", status: "Não liberado", date: "-" },
+        { num: "605", status: "Liberado para vistoria", date: "-" },
+        { num: "606", status: "Vistoriado com NC", date: "2026-10-14" }
+      ]},
+      { pav: "7º Pavimento", aptos: [
+        { num: "701", status: "Vistoriado com NC", date: "2026-10-14" },
+        { num: "702", status: "Liberado para vistoria", date: "2026-10-14" },
+        { num: "703", status: "Não liberado", date: "-" },
+        { num: "704", status: "Não liberado", date: "-" },
+        { num: "705", status: "Não liberado", date: "-" },
+        { num: "706", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "8º Pavimento", aptos: [
+        { num: "801", status: "Liberado para vistoria", date: "-" },
+        { num: "802", status: "Liberado para vistoria", date: "-" },
+        { num: "803", status: "Não liberado", date: "-" },
+        { num: "804", status: "Liberado para vistoria", date: "-" },
+        { num: "805", status: "Não liberado", date: "-" },
+        { num: "806", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "9º Pavimento", aptos: [
+        { num: "901", status: "Não liberado", date: "-" }, { num: "902", status: "Não liberado", date: "-" },
+        { num: "903", status: "Não liberado", date: "-" }, { num: "904", status: "Não liberado", date: "-" },
+        { num: "905", status: "Não liberado", date: "-" }, { num: "906", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "10º Pavimento", aptos: [
+        { num: "1001", status: "Não liberado", date: "-" }, { num: "1002", status: "Não liberado", date: "-" },
+        { num: "1003", status: "Não liberado", date: "-" }, { num: "1004", status: "Não liberado", date: "-" },
+        { num: "1005", status: "Não liberado", date: "-" }, { num: "1006", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "11º Pavimento", aptos: [
+        { num: "1101", status: "Não liberado", date: "-" }, { num: "1102", status: "Não liberado", date: "-" },
+        { num: "1103", status: "Não liberado", date: "-" }, { num: "1104", status: "Não liberado", date: "-" },
+        { num: "1105", status: "Não liberado", date: "-" }, { num: "1106", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "12º Pavimento", aptos: [
+        { num: "1201", status: "Não liberado", date: "-" }, { num: "1202", status: "Não liberado", date: "-" },
+        { num: "1203", status: "Não liberado", date: "-" }, { num: "1204", status: "Não liberado", date: "-" },
+        { num: "1205", status: "Não liberado", date: "-" }, { num: "1206", status: "Não liberado", date: "-" }
+      ]},
+      { pav: "13º Pavimento", aptos: [
+        { num: "1301", status: "Não liberado", date: "-" }, { num: "1302", status: "Não liberado", date: "-" },
+        { num: "1303", status: "Não liberado", date: "-" }, { num: "1304", status: "Não liberado", date: "-" },
+        { num: "1305", status: "Não liberado", date: "-" }, { num: "1306", status: "Não liberado", date: "-" }
+      ]}
+    ];
+
+    document.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+      if (e.key.toLowerCase() === 'b') toggleSidebar();
+    });
+
+    function showToast(msg) {
+      const box = document.getElementById('toastBox');
+      document.getElementById('toastMsg').textContent = msg;
+      box.classList.remove('hidden');
+      setTimeout(() => box.classList.add('hidden'), 3800);
+    }
+
+    function toggleSidebar() {
+      const sb = document.getElementById('leftSidebar');
+      const floatBtn = document.getElementById('floatingShowBtn');
+      sidebarOpen = !sidebarOpen;
+      if (sidebarOpen) {
+        sb.classList.remove('w-0', 'opacity-0', 'border-none');
+        sb.classList.add('w-76');
+        floatBtn.classList.add('hidden');
+        floatBtn.classList.remove('flex');
+      } else {
+        sb.classList.remove('w-76');
+        sb.classList.add('w-0', 'opacity-0', 'border-none');
+        floatBtn.classList.remove('hidden');
+        floatBtn.classList.add('flex');
+      }
+    }
+
+    function switchTab(tab) {
+      const views = { HUB: 'viewHub', SHEET: 'viewSheet', WHATS: 'viewWhats', IMPORT: 'viewImport' };
+      const btns = { HUB: 'tabBtnHub', SHEET: 'tabBtnSheet', WHATS: 'tabBtnWhats', IMPORT: 'tabBtnImport' };
+
+      Object.keys(views).forEach(k => {
+        const el = document.getElementById(views[k]);
+        const b = document.getElementById(btns[k]);
+        if (k === tab) {
+          el.classList.remove('hidden');
+          el.classList.add('flex');
+          b.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition bg-amber-500 text-slate-950 shadow flex items-center gap-1.5";
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+          b.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition text-slate-300 hover:text-white flex items-center gap-1.5";
+        }
+      });
+      if (tab === 'SHEET') renderChecklistSheet();
+      renderAll();
+    }
+
+    function saveStorage() {
+      try { localStorage.setItem('augen_ncs_v6', JSON.stringify(ncs)); } catch (e) {}
+    }
+
+    function resetData() {
+      if (confirm("Restaurar dados padrão?")) {
+        localStorage.removeItem('augen_ncs_v6');
+        ncs = JSON.parse(JSON.stringify(initialData));
+        renderAll();
+      }
+    }
+
+    // Renderiza a Aba da Planilha com os 72 Apartamentos
+    function renderChecklistSheet() {
+      const container = document.getElementById('sheetPavimentsContainer');
+      const statusColors = {
+        "Aprovado": "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+        "Vistoriado com NC": "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100",
+        "Liberado para vistoria": "bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100",
+        "Não liberado": "bg-slate-50 text-slate-400 border-slate-200 opacity-75"
+      };
+      const badgeColors = {
+        "Aprovado": "bg-emerald-500 text-white",
+        "Vistoriado com NC": "bg-amber-500 text-slate-950",
+        "Liberado para vistoria": "bg-sky-500 text-white",
+        "Não liberado": "bg-slate-200 text-slate-600"
+      };
+
+      container.innerHTML = checklistSheetData.map(pavObj => {
+        return `
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="text-xs font-black uppercase tracking-wider text-slate-500 mb-3"><i class="fa-solid fa-layer-group text-amber-500 mr-1.5"></i> ${pavObj.pav}</h3>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+              ${pavObj.aptos.map(ap => {
+                const aptoName = `APTO ${ap.num}`;
+                const hasNcs = ncs.filter(n => n.apto.includes(ap.num)).length;
+                return `
+                  <div onclick="openAptFromSheet('${aptoName}', '${pavObj.pav}')" class="cursor-pointer p-3 rounded-xl border ${statusColors[ap.status]} transition flex flex-col justify-between shadow-xs group">
+                    <div class="flex justify-between items-start mb-2">
+                      <span class="font-extrabold text-sm text-slate-800 group-hover:text-amber-600">${aptoName}</span>
+                      <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${badgeColors[ap.status]}">${ap.status}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 flex justify-between items-center pt-2 border-t border-slate-200/60">
+                      <span><i class="fa-regular fa-calendar mr-1"></i> ${ap.date}</span>${hasNcs > 0 ? `<span class="bg-red-600 text-white font-black px-1.5 py-0.2 rounded text-[10px]">${hasNcs} NCs</span>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openAptFromSheet(aptoName, pavName) {
+      currentFilter = { type: 'APTO', value: aptoName };
+      document.getElementById('breadcrumbTitle').textContent = `${pavName} > ${aptoName}`;
+      switchTab('HUB');
+    }
+
+    // Leitor de PDF e Filtro de Legendas
+    function parseCleanMobussDescription(pageText, aptoNumOnly) {
+      let raw = "";
+      const idxDesc = pageText.indexOf("Descrição");
+      raw = idxDesc !== -1 ? pageText.substring(idxDesc + 9, idxDesc + 350) : pageText;
+
+      const stopWords = ["Estudo Detalhado", "Não Conformidade", "Disposição", "Usuário de", "Relator", "Origem", "Procedência", "Data de", "Situação", "Fornecedor", "SPE IVO", "EDUARDA", "Formulário", "Identificação", "Causa Raiz", "Categoria", "Locais Envolvidos"];
+      stopWords.forEach(sw => {
+        const m = raw.match(new RegExp(sw, "i"));
+        if (m && m.index !== undefined) raw = raw.substring(0, m.index);
+      });
+
+      raw = raw.replace(/\S+@\S+/g, '').replace(/torapride\.com\.br/gi, '').replace(/\.br/gi, '').replace(/\d{2}\/\d{2}\/\d{4}/g, '').replace(/\d{2}:\d{2}/g, '').replace(/\b\d{5,7}\b/g, '').replace(/\s+/g, ' ').trim();
+
+      let ambiente = "Geral", problema = raw || "Reparo";
+      if (raw.includes("-")) {
+        const parts = raw.split("-");
+        ambiente = parts[0].trim();
+        problema = parts.slice(1).join(" ").trim();
+      }
+
+      let cleanProb = problema.replace(/TESTE COMUNICAÇÃO/gi, 'Interfone').replace(/PINTURA INTERNA/gi, 'Pintura').replace(/PISO E RODAPÉ CERÂMICO/gi, 'Piso/rodapé').replace(/AZULEJO E REJUNTES/gi, 'Azulejo/rejunte').replace(/JANELA\s*\/\s*PORTA\s*JANELA/gi, 'Janela').replace(/NÚMERO PREDIAL/gi, 'Colocar número predial').replace(/\s+/g, ' ').trim();
+      cleanProb = cleanProb.charAt(0).toUpperCase() + cleanProb.slice(1).toLowerCase();
+
+      let waCaption = `${cleanProb} ${aptoNumOnly}`;
+      const ambLower = ambiente.toLowerCase();
+      if (ambLower !== "geral" && !cleanProb.toLowerCase().includes(ambLower)) waCaption += ` ${ambLower}`;
+
+      return {
+        ambiente: ambiente.charAt(0).toUpperCase() + ambiente.slice(1).toLowerCase(),
+        item: problema.split(" ").slice(0, 3).join(" ") || "Inspeção",
+        falha: cleanProb,
+        waCaption: waCaption.replace(/\s+/g, ' ').trim()
+      };
+    }
+
+    async function extractPurePhotosFromPage(pdfDoc, pageNum, hasActionPlanTable) {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const W = canvas.width, H = canvas.height;
+      const imgData = ctx.getImageData(0, 0, W, H).data;
+      const scanTop = Math.floor(H * (hasActionPlanTable ? 0.36 : 0.10));
+      const scanBottom = Math.floor(H * 0.91);
+      const scanLeft = Math.floor(W * 0.03), scanRight = Math.floor(W * 0.97);
+
+      const isNotWhite = (x, y) => {
+        const idx = (y * W + x) * 4;
+        return (imgData[idx] < 246 || imgData[idx + 1] < 246 || imgData[idx + 2] < 246);
+      };
+
+      const photoRows = new Uint8Array(H);
+      for (let y = scanTop; y <= scanBottom; y++) {
+        let nonWhiteCount = 0;
+        for (let x = scanLeft; x <= scanRight; x += 2) { if (isNotWhite(x, y)) nonWhiteCount++; }
+        if ((nonWhiteCount * 2) / (scanRight - scanLeft) > 0.22) photoRows[y] = 1;
+      }
+
+      const verticalBands = [];
+      let inBand = false, startY = 0, gapTolerance = 0;
+      for (let y = scanTop; y <= scanBottom; y++) {
+        if (photoRows[y]) {
+          if (!inBand) { inBand = true; startY = y; }
+          gapTolerance = 0;
+        } else if (inBand) {
+          gapTolerance++;
+          if (gapTolerance > 14) {
+            const endY = y - gapTolerance;
+            if (endY - startY > H * 0.12) verticalBands.push({ top: startY, bottom: endY });
+            inBand = false;
+          }
+        }
+      }
+      if (inBand && (scanBottom - startY > H * 0.12)) verticalBands.push({ top: startY, bottom: scanBottom });
+
+      const croppedPhotos = [];
+      for (let band of verticalBands) {
+        let colCounts = new Uint32Array(W);
+        const bandHeight = band.bottom - band.top;
+        for (let x = scanLeft; x <= scanRight; x++) {
+          let count = 0;
+          for (let y = band.top; y <= band.bottom; y += 2) { if (isNotWhite(x, y)) count++; }
+          colCounts[x] = count * 2;
+        }
+
+        let minX = scanLeft;
+        while (minX < scanRight && colCounts[minX] < bandHeight * 0.35) minX++;
+        let maxX = scanRight;
+        while (maxX > minX && colCounts[maxX] < bandHeight * 0.35) maxX--;
+
+        const finalX = minX + 2, finalY = band.top + 2;
+        const finalW = Math.max(10, (maxX - minX) - 4);
+        const finalH = Math.max(10, (band.bottom - band.top) - 4);
+
+        const outCanvas = document.createElement('canvas');
+        outCanvas.width = finalW; outCanvas.height = finalH;
+        outCanvas.getContext('2d').drawImage(canvas, finalX, finalY, finalW, finalH, 0, 0, finalW, finalH);
+        croppedPhotos.push(outCanvas.toDataURL('image/jpeg', 0.88));
+      }
+      return croppedPhotos;
+    }
+
+    async function createCombinedPhotoAndCaptionBlob(dataUrl, captionText, burnCaption) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!burnCaption) {
+            canvas.width = img.width; canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+          } else {
+            const barHeight = Math.max(58, Math.round(img.height * 0.11));
+            canvas.width = img.width; canvas.height = img.height + barHeight;
+            ctx.drawImage(img, 0, 0);
+            ctx.fillStyle = "#ffffff"; ctx.fillRect(0, img.height, canvas.width, barHeight);
+            ctx.fillStyle = "#e2e8f0"; ctx.fillRect(0, img.height, canvas.width, 2);
+            const fontSize = Math.max(18, Math.min(28, Math.round(canvas.width * 0.036)));
+            ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+            ctx.fillStyle = "#0f172a"; ctx.textBaseline = "middle";
+            ctx.fillText(captionText, 18, img.height + (barHeight / 2));
+          }
+          canvas.toBlob(blob => resolve(blob), 'image/png');
+        };
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
+    }
+
+    async function copyCombinedWhatsApp(ncId, photoIndex = 0) {
+      const item = ncs.find(n => n.id === ncId);
+      if (!item || !item.extractedImgs || !item.extractedImgs[photoIndex]) {
+        alert("Importe o PDF na aba 'Importar PDF' primeiro!");
+        switchTab('IMPORT');
+        return;
+      }
+      const inputEl = document.getElementById(`caption_input_${ncId}`);
+      const caption = inputEl ? inputEl.value : item.waCaption;
+      const burnToggle = document.getElementById('burnCaptionToggle');
+      const shouldBurn = burnToggle ? burnToggle.checked : true;
+
+      try {
+        const pngBlob = await createCombinedPhotoAndCaptionBlob(item.extractedImgs[photoIndex], caption, shouldBurn);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+        item.sentWa = true;
+        saveStorage();
+        renderWhatsQueue();
+        showToast(`Copiado! Dê apenas 1 Ctrl+V no WhatsApp.`);
+      } catch (err) {
+        alert("Erro ao copiar: " + err.message);
+      }
+    }
+
+    async function copyOnlyCaption(ncId) {
+      const inputEl = document.getElementById(`caption_input_${ncId}`);
+      const item = ncs.find(n => n.id === ncId);
+      await navigator.clipboard.writeText(inputEl ? inputEl.value : item.waCaption);
+      showToast(`Legenda copiada!`);
+    }
+
+    async function shareNativeWhatsApp(ncId, photoIndex = 0) {
+      const item = ncs.find(n => n.id === ncId);
+      if (!item || !item.extractedImgs || !item.extractedImgs[photoIndex]) return;
+      const inputEl = document.getElementById(`caption_input_${ncId}`);
+      const caption = inputEl ? inputEl.value : item.waCaption;
+      try {
+        const res = await fetch(item.extractedImgs[photoIndex]);
+        const blob = await res.blob();
+        const file = new File([blob], `NC_${item.id}.jpg`, { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: caption });
+          item.sentWa = true; saveStorage(); renderWhatsQueue();
+        } else {
+          await copyCombinedWhatsApp(ncId, photoIndex);
+        }
+      } catch (e) {}
+    }
+
+    function updateCaptionText(ncId, newVal) {
+      const item = ncs.find(n => n.id === ncId);
+      if (item) { item.waCaption = newVal; saveStorage(); }
+    }
+
+    function renderWhatsQueue() {
+      const container = document.getElementById('waBubblesContainer');
+      const filtered = getFilteredNCs();
+      document.getElementById('waQueueCount').textContent = `${filtered.length} na fila`;
+
+      container.innerHTML = filtered.map((item, index) => {
+        const idx = activePhotoIdx[item.id] || 0;
+        const totalPhotos = Math.max(item.fotos.length, item.extractedImgs ? item.extractedImgs.length : 1);
+        const hasExtracted = item.extractedImgs && item.extractedImgs[idx];
+        const imgSrc = hasExtracted ? item.extractedImgs[idx] : getWaitingBanner(item.fotos[idx] || "Foto");
+        const defaultCaption = item.waCaption;
+
+        return `
+          <div class="flex flex-col md:flex-row items-start gap-4 bg-white/80 p-3.5 rounded-2xl border border-slate-300 shadow-sm">
+            <div class="wa-bubble p-2 w-full md:w-80 shrink-0 border border-slate-200">
+              <div class="text-[11px] font-bold text-sky-600 px-1 pb-1 flex justify-between items-center">
+                <span>José Eduardo PRIDE</span>
+                <span class="text-[10px] text-slate-400 font-normal">NC #${item.id}</span>
+              </div>
+              <div class="relative rounded-lg overflow-hidden bg-slate-900">
+                <img src="${imgSrc}" onclick="openZoom('${imgSrc}', '${defaultCaption}')" class="w-full h-auto max-h-72 object-contain mx-auto block cursor-zoom-in">
+                ${totalPhotos > 1 ? `
+                  <button onclick="changePhoto('${item.id}', -1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                  <button onclick="changePhoto('${item.id}', 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                  <span class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-bold">${idx + 1}/${totalPhotos}</span>
+                ` : ''}
+              </div>
+              <div class="pt-2 px-1 flex items-end justify-between gap-2">
+                <span class="text-[13px] text-slate-900 leading-snug font-semibold break-words">${defaultCaption}</span>
+                <span class="text-[10px] text-slate-400 shrink-0">13:20 <i class="fa-solid fa-check-double text-sky-500"></i></span>
+              </div>
+            </div>
+
+            <div class="flex-1 w-full flex flex-col justify-between space-y-3 p-1">
+              <div>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-black uppercase text-slate-500">${item.apto} — ${item.ambiente} (${item.equipe})</span>
+                  ${item.sentWa ? `<span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full"><i class="fa-solid fa-check mr-1"></i> Enviada</span>` : ''}
+                </div>
+                <label class="block text-[11px] font-bold text-slate-600 mt-2 mb-1">Legenda curta:</label>
+                <input type="text" id="caption_input_${item.id}" value="${defaultCaption}" oninput="updateCaptionText('${item.id}', this.value)"
+                  class="w-full border border-slate-300 focus:border-emerald-500 rounded-lg px-3 py-2 text-sm font-bold text-slate-900 bg-white shadow-inner">
+              </div>
+
+              <div class="flex flex-col sm:flex-row gap-2 pt-1">
+                <button onclick="copyCombinedWhatsApp('${item.id}', ${idx})" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition">
+                  <i class="fa-brands fa-whatsapp text-base"></i> Copiar Foto + Legenda (1 Ctrl+V)
+                </button>
+                <button onclick="copyOnlyCaption('${item.id}')" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
+                  <i class="fa-regular fa-copy"></i> Só Texto
+                </button>
+              </div>
+
+              <div class="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                <b>Serviço:</b> ${item.acao}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function processMultiplePDFs(event) {
+      const files = Array.from(event.target.files);
+      if (!files.length) return;
+
+      const box = document.getElementById('importProgressBox');
+      const statusText = document.getElementById('importStatusText');
+      const percentText = document.getElementById('importPercentText');
+      const bar = document.getElementById('importProgressBar');
+      const log = document.getElementById('importLogList');
+
+      box.classList.remove('hidden');
+      log.innerHTML = '';
+
+      for (let fIdx = 0; fIdx < files.length; fIdx++) {
+        const file = files[fIdx];
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+        const pageTexts = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+          const page = await pdf.getPage(p);
+          const textContent = await page.getTextContent();
+          pageTexts.push({ pageNum: p, text: textContent.items.map(i => i.str).join(' ') });
+        }
+
+        const ncBlocks = [];
+        let currentBlock = null;
+        pageTexts.forEach(pt => {
+          const matchId = pt.text.match(/Não Conformidade Número\s+(\d+)/i);
+          if (matchId) {
+            if (currentBlock) ncBlocks.push(currentBlock);
+            currentBlock = { id: matchId[1], pages: [pt] };
+          } else if (currentBlock) {
+            currentBlock.pages.push(pt);
+          }
+        });
+        if (currentBlock) ncBlocks.push(currentBlock);
+
+        for (let bIdx = 0; bIdx < ncBlocks.length; bIdx++) {
+          const block = ncBlocks[bIdx];
+          const firstPageText = block.pages[0].text;
+          const fullText = block.pages.map(p => p.text).join(' ');
+
+          const extractedImgs = [];
+          for (let pObj of block.pages.slice(1)) {
+            const hasActionPlan = pObj.text.includes("Plano de Ação");
+            const photosFromPage = await extractPurePhotosFromPage(pdf, pObj.pageNum, hasActionPlan);
+            extractedImgs.push(...photosFromPage);
+          }
+
+          const pavMatch = fullText.match(/Pavimento\s+\d+/i);
+          const aptoMatch = fullText.match(/APTO\s+\d+/i) || fullText.match(/(\d{3,4})\s*-\s*APTO/i);
+          const aptoClean = aptoMatch ? aptoMatch[0].toUpperCase().replace('-', '').trim() : "APTO";
+          const numOnly = aptoClean.replace('APTO', '').trim();
+
+          const cleaned = parseCleanMobussDescription(firstPageText, numOnly);
+          const { equipe, acao } = classifyTeamAndAction(cleaned.falha + " " + cleaned.ambiente);
+
+          const existing = ncs.find(n => n.id === block.id);
+          if (existing) {
+            existing.extractedImgs = extractedImgs;
+          } else {
+            ncs.unshift({
+              id: block.id,
+              pav: pavMatch ? pavMatch[0] : "Pavimento",
+              apto: aptoClean.startsWith("APTO") ? aptoClean : `APTO ${numOnly}`,
+              ambiente: cleaned.ambiente,
+              item: cleaned.item,
+              falha: cleaned.falha,
+              waCaption: cleaned.waCaption,
+              equipe, acao,
+              data: new Date().toLocaleDateString('pt-BR'),
+              status: "Aberta",
+              fotos: ["Foto"],
+              extractedImgs
+            });
+          }
+        }
+      }
+
+      statusText.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Importação concluída!`;
+      saveStorage();
+      renderAll();
+      setTimeout(() => switchTab('WHATS'), 800);
+    }
+
+    function classifyTeamAndAction(desc) {
+      const u = desc.toUpperCase();
+      if (u.includes("REQUADRO") || u.includes("FACHADA")) return { equipe: "Pedreiro / Fachada", acao: "Regularizar requadro e pintar" };
+      if (u.includes("PISO") || u.includes("AZULEJO") || u.includes("REJUNTE") || u.includes("NICHO")) return { equipe: "Azulejista", acao: "Revisar assentamento e rejuntar" };
+      if (u.includes("PORTA")) return { equipe: "Carpinteiro", acao: "Ajustar folha/batente e ferragens" };
+      if (u.includes("JANELA") || u.includes("ESQUADRIA")) return { equipe: "Esquadrias", acao: "Retoque técnico no alumínio" };
+      if (u.includes("FORRO") || u.includes("GESSO") || u.includes("TRINCA")) return { equipe: "Gesseiro / Pintor", acao: "Tratar trinca no forro e repintar" };
+      if (u.includes("COMUNICAÇÃO") || u.includes("INTERFONE") || u.includes("ELÉTRICA")) return { equipe: "Eletricista", acao: "Conectar fiação e testar" };
+      if (u.includes("NÚMERO PREDIAL")) return { equipe: "Acabamento Final", acao: "Instalar número predial" };
+      return { equipe: "Pintor", acao: "Emassar, lixar e repintar" };
+    }
+
+    function getWaitingBanner(n) {
+      return "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="360"><rect width="100%" height="100%" fill="#0f172a"/><text x="50%" y="50%" fill="#10b981" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">IMPORTAR PDF DA NC</text></svg>`);
+    }
+
+    function getFilteredNCs() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const role = document.getElementById('roleFilter').value;
+      return ncs.filter(item => {
+        if (currentFilter.type === 'PAV' && item.pav !== currentFilter.value) return false;
+        if (currentFilter.type === 'APTO' && item.apto !== currentFilter.value) return false;
+        if (currentFilter.type === 'AMB' && `${item.apto}|${item.ambiente}` !== currentFilter.value) return false;
+        if (role !== 'ALL' && item.equipe !== role) return false;
+        if (search) {
+          return `${item.id} ${item.apto} ${item.ambiente} ${item.falha} ${item.waCaption} ${item.equipe}`.toLowerCase().includes(search);
+        }
+        return true;
+      });
+    }
+
+    function renderTree() {
+      const container = document.getElementById('treeContainer');
+      const tree = {};
+      ncs.forEach(item => {
+        if (!tree[item.pav]) tree[item.pav] = {};
+        if (!tree[item.pav][item.apto]) tree[item.pav][item.apto] = {};
+        if (!tree[item.pav][item.apto][item.ambiente]) tree[item.pav][item.apto][item.ambiente] = [];
+        tree[item.pav][item.apto][item.ambiente].push(item);
+      });
+
+      let html = `<div onclick="selectNode('ALL', 'ALL', 'Todos os Apartamentos')" class="cursor-pointer px-3 py-2 rounded-lg font-bold flex items-center justify-between ${currentFilter.type === 'ALL' ? 'bg-amber-50 text-amber-900 border border-amber-200' : 'hover:bg-slate-100 text-slate-700'}"><span><i class="fa-solid fa-building mr-2 text-amber-500"></i> AUGEN (72 Apts)</span><span class="text-xs bg-slate-200 px-2 py-0.5 rounded-full">${ncs.length}</span></div>`;
+
+      Object.keys(tree).sort().forEach(pav => {
+        html += `<div class="pl-3 mt-2 border-l-2 border-slate-100 space-y-1"><div onclick="selectNode('PAV', '${pav}', '${pav}')" class="cursor-pointer px-2 py-1.5 rounded-md font-semibold text-slate-600 hover:bg-slate-100 text-xs"><i class="fa-solid fa-layer-group mr-1.5 text-slate-400"></i> ${pav}</div>`;
+        Object.keys(tree[pav]).sort().forEach(apto => {
+          const isSelected = currentFilter.type === 'APTO' && currentFilter.value === apto;
+          html += `<div class="pl-3"><div onclick="selectNode('APTO', '${apto}', '${apto}')" class="cursor-pointer px-2 py-1 rounded text-xs font-bold flex justify-between ${isSelected ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}"><span><i class="fa-solid fa-door-open mr-1 text-amber-500"></i> ${apto}</span><span class="bg-red-100 text-red-700 px-1.5 py-0.2 rounded text-[10px]">${Object.values(tree[pav][apto]).flat().length}</span></div></div>`;
+        });
+        html += `</div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function selectNode(type, value, label) {
+      currentFilter = { type, value };
+      document.getElementById('breadcrumbTitle').textContent = label;
+      renderAll();
+    }
+
+    function changePhoto(ncId, dir) {
+      const item = ncs.find(n => n.id === ncId);
+      if (!item) return;
+      const total = Math.max(item.fotos.length, item.extractedImgs ? item.extractedImgs.length : 1);
+      activePhotoIdx[ncId] = ((activePhotoIdx[ncId] || 0) + dir + total) % total;
+      renderAll();
+    }
+
+    function toggleStatus(id) {
+      const item = ncs.find(n => n.id === id);
+      if (!item) return;
+      const order = ["Aberta", "Em Correção", "Concluída"];
+      item.status = order[(order.indexOf(item.status) + 1) % order.length];
+      saveStorage();
+      renderAll();
+    }
+
+    function openZoom(src, title) {
+      document.getElementById('zoomImg').src = src;
+      document.getElementById('zoomTitle').textContent = title;
+      document.getElementById('zoomModal').classList.remove('hidden');
+      document.getElementById('zoomModal').classList.add('flex');
+    }
+
+    function closeZoom() {
+      document.getElementById('zoomModal').classList.add('hidden');
+      document.getElementById('zoomModal').classList.remove('flex');
+    }
+
+    function renderCards() {
+      const grid = document.getElementById('cardsGrid');
+      const filtered = getFilteredNCs();
+
+      grid.innerHTML = filtered.map(item => {
+        const idx = activePhotoIdx[item.id] || 0;
+        const totalPhotos = Math.max(item.fotos.length, item.extractedImgs ? item.extractedImgs.length : 1);
+        const hasExtracted = item.extractedImgs && item.extractedImgs[idx];
+        const imgSrc = hasExtracted ? item.extractedImgs[idx] : getWaitingBanner(item.fotos[idx]);
+
+        return `
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+            <div>
+              <div class="relative h-52 bg-slate-950 group">
+                <img src="${imgSrc}" onclick="openZoom('${imgSrc}', '${item.waCaption}')" class="w-full h-full object-cover cursor-zoom-in">
+                <div class="absolute top-3 left-3 flex gap-1.5">
+                  <span class="bg-slate-900 text-white text-xs font-black px-2 py-1 rounded">NC #${item.id}</span>
+                  <span class="bg-amber-500 text-slate-950 text-xs font-black px-2 py-1 rounded">${item.apto}</span>
+                </div>
+                ${totalPhotos > 1 ? `
+                  <button onclick="changePhoto('${item.id}', -1)" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-left"></i></button>
+                  <button onclick="changePhoto('${item.id}', 1)" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-right"></i></button>
+                ` : ''}
+              </div>
+              <div class="p-4">
+                <span class="text-[11px] font-bold uppercase text-amber-600">${item.ambiente} — ${item.equipe}</span>
+                <div class="mt-1 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-bold text-slate-800">
+                  <i class="fa-brands fa-whatsapp text-emerald-600 mr-1"></i> ${item.waCaption}
+                </div>
+              </div>
+            </div>
+            <div class="px-3 py-2 bg-slate-50 border-t border-slate-100 flex gap-2 text-xs">
+              <button onclick="copyCombinedWhatsApp('${item.id}', ${idx})" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 shadow transition">
+                <i class="fa-brands fa-whatsapp text-sm"></i> Copiar Foto + Legenda (1 Ctrl+V)
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openModal() {
+      document.getElementById('addModal').classList.remove('hidden');
+      document.getElementById('addModal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('addModal').classList.add('hidden');
+      document.getElementById('addModal').classList.remove('flex');
+    }
+
+    function saveNewNC(e) {
+      e.preventDefault();
+      const files = Array.from(document.getElementById('fFoto').files);
+      const cap = document.getElementById('fWaCaption').value;
+
+      const finishSave = (imgs) => {
+        ncs.unshift({
+          id: document.getElementById('fNum').value,
+          pav: document.getElementById('fPav').value,
+          apto: document.getElementById('fApto').value.toUpperCase(),
+          ambiente: document.getElementById('fAmb').value,
+          item: cap, falha: cap, waCaption: cap,
+          equipe: document.getElementById('fEquipe').value,
+          acao: "Corrigir apontamento",
+          status: "Aberta", fotos: ["Manual"],
+          extractedImgs: imgs
+        });
+        saveStorage(); closeModal(); document.getElementById('ncForm').reset(); renderAll();
+      };
+
+      if (files.length > 0) {
+        let imgs = [], count = 0;
+        files.forEach(f => {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            imgs.push(ev.target.result); count++;
+            if (count === files.length) finishSave(imgs);
+          };
+          reader.readAsDataURL(f);
+        });
+      } else { finishSave([]); }
+    }
+
+    function renderAll() {
+      renderTree();
+      renderCards();
+      renderWhatsQueue();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
